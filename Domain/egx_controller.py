@@ -1,7 +1,7 @@
 from datetime import datetime
 import logging
 import os
-from egxpy.download import get_OHLCV_data, get_EGX_intraday_data, get_EGXdata
+from Domain.download import get_OHLCV_data, get_EGX_intraday_data, get_EGXdata
 from Domain.date_parser import DateParser
 
 

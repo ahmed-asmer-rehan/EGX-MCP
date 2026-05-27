@@ -155,26 +155,29 @@ class EGXController:
         return self.__getRisers(todays_date,todays_date,get_EGX_intraday_data,'1 Minute',NCompanies)
 
     def __getRisers(self,todays_date:datetime,end_date:datetime,func,timing,NCompanies):
-        """
-        ToDo: Fix issue: MCP error -32001: Request timed out when calling this function with get_EGXdata and a long time period. 
-        Consider implementing pagination or batching to handle large data requests. 
-        Also check for top gainers trackers APIs from egxpy or tvfeeds to avoid fetching unnecessary data for all companies 
-        when only the top risers are needed.
-        Args:
-            todays_date (datetime): The current date for which to calculate the risers.
-            end_date (datetime): The starting date for the period over which to calculate the risers.
-            func (function): The function to fetch data, either get_EGXdata or get_EGX_intraday_data.
-            timing (str): The timing parameter for the data fetch function, either 'Daily' or '1 Minute'.
-            NCompanies (int): The number of top risers to return.
-        """
-        tickers = [ticker for ticker in self.__egx30_companies_dict.values()]
+        tickers = list(self.__egx30_companies_dict.values())
         today = self.parser.stringfyDates(todays_date)
         beginning = self.parser.stringfyDates(end_date)
         response = func(tickers,timing,beginning,today)
-        deltas = {
-            t: ((float(response[t].tolist()[-1]) - float(response[t].tolist()[0])) / float(response[t].tolist()[0])) * 100
-            for t in response
-            }
+
+        deltas = {}
+        for t in response:
+            try:
+                prices = response[t].tolist()
+                if len(prices) < 2:
+                    continue
+                first = float(prices[0])
+                last = float(prices[-1])
+                if first == 0:
+                    continue
+                deltas[t] = ((last - first) / first) * 100
+            except Exception as e:
+                logger.warning(f"Skipping ticker {t} in riser calculation: {e}")
+                continue
+
+        if not deltas:
+            return {}
+
         topN = sorted(deltas, key=lambda t: deltas[t],reverse=True)[:NCompanies]
         return {ticker:[float(x) for x in response[ticker].tolist()] for ticker in topN}
 

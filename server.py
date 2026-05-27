@@ -1,6 +1,7 @@
 from mcp.server.fastmcp import FastMCP
 from datetime import datetime,timedelta
 from pydantic import BaseModel
+import anyio
 from Domain.egx_controller import EGXController
 from Domain.gold_controller import GoldController
 
@@ -121,9 +122,8 @@ def get_intraday_readings(company_ticker:str, todays_date:datetime) -> FloatList
     result = FloatListResponse(values=stocks.getIntraday(company_ticker,todays_date))
     return result
 
-# todo: MCP error -32001: Request timed out
 @mcp.tool()
-def get_risers_overtime(todays_date:datetime, beginning_date:datetime, n_companies:int = 5)-> dict[str,list[float]]:
+async def get_risers_overtime(todays_date:datetime, beginning_date:datetime, n_companies:int = 5)-> dict[str,list[float]]:
     """
     Get the top N stocks that increased in value over a period of time
     Fall back to get_riser_intraday() instead for today
@@ -134,11 +134,13 @@ def get_risers_overtime(todays_date:datetime, beginning_date:datetime, n_compani
     Returns
         {ticker:List[float]}: dicts of a ticker and its prices
     """
-    return stocks.getPeriodRisers(todays_date,beginning_date,n_companies)
+    return await anyio.to_thread.run_sync(
+        lambda: stocks.getPeriodRisers(todays_date,beginning_date,n_companies),
+        abandon_on_cancel=True,
+    )
 
-# todo: MCP error -32001: Request timed out
 @mcp.tool()
-def get_riser_intraday(todays_date:datetime, n_companies:int = 5) -> dict[str,list[float]]:
+async def get_riser_intraday(todays_date:datetime, n_companies:int = 5) -> dict[str,list[float]]:
     """
     Get the top N stocks that increased in value today
     Args
@@ -147,7 +149,10 @@ def get_riser_intraday(todays_date:datetime, n_companies:int = 5) -> dict[str,li
     Returns
         {ticker:List[float]}: dicts of a ticker and its prices
     """
-    return stocks.getIntradayRiser(todays_date,n_companies)
+    return await anyio.to_thread.run_sync(
+        lambda: stocks.getIntradayRiser(todays_date,n_companies),
+        abandon_on_cancel=True,
+    )
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")

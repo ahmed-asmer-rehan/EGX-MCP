@@ -118,15 +118,39 @@ class EGXController:
 
     def getEGXCompanies(self):
         return self.__egx30_companies_dict
-    
+
+    def findTicker(self, query: str) -> dict:
+        """Case-insensitive substring match of query against company names."""
+        needle = query.strip().lower()
+        return {
+            name: ticker
+            for name, ticker in self.__egx30_companies_dict.items()
+            if needle in name.lower()
+        }
+
     def getLastDailyPrice(self,ticker: str):
         response = get_OHLCV_data(ticker, "EGX", "Daily", 1)
         return float(response['close'].tolist()[0])
 
     def getLivePrice(self,ticker:str):
+        price, _ = self.getLivePriceWithFallbackFlag(ticker)
+        return price
+
+    def getLivePriceWithFallbackFlag(self,ticker:str):
+        """
+        Same value as getLivePrice, plus whether it's a last-close fallback.
+
+        Kept as a separate method (rather than changing getLivePrice's return type)
+        so the existing MCP tool (server.py get_live_price -> float) keeps working
+        unmodified; only the CLI, which needs to report the fallback, calls this.
+        """
         today = self.parser.stringfyDates(datetime.today())
-        response = get_EGX_intraday_data([ticker],"1 Minute",today, today)
-        return float(response[ticker].tolist()[-1])
+        try:
+            response = get_EGX_intraday_data([ticker],"1 Minute",today, today)
+            return float(response[ticker].tolist()[-1]), False
+        except Exception as e:
+            logger.warning(f"Live price unavailable for {ticker}, falling back to last close: {e}")
+            return self.getLastDailyPrice(ticker), True
 
     def getPriceChange(self,todays_date:datetime,
                        beginning_date:datetime,
@@ -135,7 +159,7 @@ class EGXController:
             today = self.parser.stringfyDates(todays_date)
             initial_date = self.parser.stringfyDates(beginning_date)
             response = get_EGXdata([ticker],"Daily",initial_date,today)
-            logger.info(type(response), response)
+            logger.debug(f"getPriceChange response type={type(response)}: {response}")
             return [float(x) for x in response[ticker].tolist()]
         except Exception as e:
             logger.error(f"Error fetching price change for {ticker}: {e}")

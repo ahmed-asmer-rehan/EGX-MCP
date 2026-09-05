@@ -1,6 +1,13 @@
 # EGX-MCP 📈
 
-A **Model Context Protocol (MCP) server** that exposes Egyptian Exchange (EGX) stock market data and live gold prices as AI-callable tools — enabling LLMs like Claude to query real-time and historical Egyptian market data conversationally.
+Egyptian Exchange (EGX) stock market data and live gold prices, for AI agents, via two
+integration surfaces:
+
+- **`egx` CLI** — for **Claude Cowork** and **Claude Code**, which invoke it directly as a
+  subprocess. This is the primary, actively-developed surface going forward.
+- **MCP server** (`server.py`) — for **Claude Desktop** (chat), which connects to it over MCP
+  stdio. Kept in place and unmodified; considered **deprecated** for any client that can use the
+  CLI instead.
 
 ---
 
@@ -8,6 +15,7 @@ A **Model Context Protocol (MCP) server** that exposes Egyptian Exchange (EGX) s
 
 - [Features](#features)
 - [Project Structure](#project-structure)
+- [The `egx` CLI (Claude Cowork / Claude Code)](#the-egx-cli-claude-cowork--claude-code)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Configuration](#configuration)
@@ -38,13 +46,52 @@ A **Model Context Protocol (MCP) server** that exposes Egyptian Exchange (EGX) s
 ```
 egx-mcp/
 │
-├── server.py                   # MCP server entry point — registers all tools and resources
+├── server.py                   # MCP server entry point (Claude Desktop) — deprecated for Cowork/Code
+│
+├── egx_cli/                    # `egx` CLI entry point (Claude Cowork, Claude Code)
+│   ├── app.py                  # Typer app; registers all subcommands
+│   ├── commands/                # price, companies, history, risers, gold
+│   ├── output.py                # shared text/--json rendering, exit codes
+│   └── timing.py                # per-command time-budget enforcement
 │
 └── Domain/
-    ├── egx_controller.py       # EGX stock data logic (prices, intraday, risers)
-    ├── gold_controller.py      # Gold price scraper
+    ├── egx_controller.py       # EGX stock data logic (prices, intraday, risers) — shared by both surfaces
+    ├── gold_controller.py      # Gold price scraper — shared by both surfaces
     └── date_parser.py          # Date formatting utility
 ```
+
+---
+
+## The `egx` CLI (Claude Cowork / Claude Code)
+
+Install it from this repo:
+
+```bash
+uv tool install .
+```
+
+This registers the `egx` command (`egx.exe` on Windows) via `uv`/`pipx`'s standard console-script
+mechanism — no separate packaging step per platform.
+
+> **If you already have `egx` installed and pulled newer code**, plain `uv tool install .` will
+> silently do nothing — `uv` sees the same package version already installed and skips rebuilding
+> from the changed source. Use `uv tool install . --reinstall` to force it to pick up local
+> changes.
+
+```bash
+egx price live COMI                 # current price, falls back to last close
+egx companies find "Commercial International"
+egx history range COMI 2026-08-01 2026-09-01
+egx risers period 2026-08-25 2026-09-01 --count 3
+egx gold
+```
+
+Add `--json` to any command for structured output. Full command reference, arguments, and output
+shapes: [`.claude/skills/egx-cli/SKILL.md`](.claude/skills/egx-cli/SKILL.md) — this is also what
+Claude Code and Claude Cowork read to know how to invoke `egx`. See
+[`specs/001-egx-cli/quickstart.md`](specs/001-egx-cli/quickstart.md) for more examples and
+[`specs/001-egx-cli/contracts/cli-contract.md`](specs/001-egx-cli/contracts/cli-contract.md) for
+the full interface contract (exit codes, time budgets, JSON schemas).
 
 ---
 
@@ -75,6 +122,10 @@ uv sync
 ---
 
 ## Configuration
+
+The sections below (Configuration through Available Resources) describe the **MCP server**, used
+by **Claude Desktop** only. If you're setting this up for Claude Cowork or Claude Code, use the
+[`egx` CLI](#the-egx-cli-claude-cowork--claude-code) above instead.
 
 ### Claude Desktop
 

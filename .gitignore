@@ -2,5 +2,12 @@
 .venv
 CLAUDE.md
 bash.exe.stackdump
-.claude
+.claude/*
+!.claude/skills
+.claude/skills/*
+!.claude/skills/egx-cli
 logs
+.specify/*
+!.specify/memory
+.specify/memory/*
+!.specify/memory/constitution.md

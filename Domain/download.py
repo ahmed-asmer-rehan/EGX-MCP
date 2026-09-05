@@ -120,15 +120,25 @@ def get_EGXdata(stock_list:list, interval:str, start:date, end:date):
             symbol=stock, exchange='EGX',
             interval=interval, n_bars=work_days_count)
 
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    executor = ThreadPoolExecutor(max_workers=10)
+    try:
         futures = {executor.submit(_fetch_one, stock): stock for stock in stock_list}
-        for future in as_completed(futures, timeout=25):
-            stock = futures[future]
-            try:
-                _, close = future.result(timeout=0)
-                close_prices_dic[stock] = close
-            except Exception as e:
-                skip_dic[stock] = str(e)
+        try:
+            for future in as_completed(futures, timeout=25):
+                stock = futures[future]
+                try:
+                    _, close = future.result(timeout=0)
+                    close_prices_dic[stock] = close
+                except Exception as e:
+                    skip_dic[stock] = str(e)
+        except TimeoutError:
+            # A timeout here means some futures are still pending; keep whatever
+            # already completed instead of discarding the whole batch (see
+            # research.md R3 addendum for the incident this fixes).
+            pending = [futures[f] for f in futures if not f.done()]
+            logger.warning("Timed out waiting for tickers: {}".format(pending))
+    finally:
+        executor.shutdown(wait=False)
 
     logger.info("Got Stock Prices: {}".format(close_prices_dic.keys()))
     logger.info("Failed Stocks: {}".format(skip_dic))
@@ -175,15 +185,24 @@ def get_EGX_intraday_data(stock_list:list, interval:str, start:date, end:date):
             symbol=stock, exchange='EGX',
             interval=interval, n_bars=n)
 
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    executor = ThreadPoolExecutor(max_workers=10)
+    try:
         futures = {executor.submit(_fetch_one, stock): stock for stock in stock_list}
-        for future in as_completed(futures, timeout=25):
-            stock = futures[future]
-            try:
-                _, close = future.result(timeout=0)
-                close_prices_dic[stock] = close
-            except Exception as e:
-                skip_dic[stock] = str(e)
+        try:
+            for future in as_completed(futures, timeout=25):
+                stock = futures[future]
+                try:
+                    _, close = future.result(timeout=0)
+                    close_prices_dic[stock] = close
+                except Exception as e:
+                    skip_dic[stock] = str(e)
+        except TimeoutError:
+            # See get_EGXdata above: keep whatever completed rather than discarding
+            # the whole batch on a partial timeout (research.md R3 addendum).
+            pending = [futures[f] for f in futures if not f.done()]
+            logger.warning("Timed out waiting for tickers: {}".format(pending))
+    finally:
+        executor.shutdown(wait=False)
 
     logger.info("Got Intraday Prices: {}".format(close_prices_dic.keys()))
     logger.info("Failed Stocks: {}".format(skip_dic))

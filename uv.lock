@@ -240,7 +240,7 @@ wheels = [
 [[package]]
 name = "egx-mcp"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "bs4" },
     { name = "holidays" },
@@ -250,6 +250,7 @@ dependencies = [
     { name = "pandas" },
     { name = "retry" },
     { name = "tvdatafeed" },
+    { name = "typer" },
 ]
 
 [package.metadata]
@@ -262,6 +263,7 @@ requires-dist = [
     { name = "pandas", specifier = ">=3.0.3" },
     { name = "retry", specifier = ">=0.9.2" },
     { name = "tvdatafeed", git = "https://github.com/rongardF/tvdatafeed.git?rev=main" },
+    { name = "typer", specifier = ">=0.15.1" },
 ]
 
 [[package]]
